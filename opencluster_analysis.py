@@ -1,3 +1,4 @@
+from tkinter import Label
 import numpy as np
 from scipy import linalg
 import matplotlib.pyplot as plt
@@ -90,12 +91,13 @@ def gauss_mix(X,n,mode,plot=False):
 def readARG():
     try:
         file_name = sys.argv[1]
-        return file_name
+        gnum = int(sys.argv[2])
+        return file_name, gnum
     except:
         print("Syntax -> python3 filename.csv")
     exit()
 
-file_name = readARG()
+file_name, gnum = readARG()
 fname = os.path.splitext(file_name)[0]
 print(fname)
 
@@ -131,6 +133,12 @@ print('after parallax uncertainity filter: ',len(df1))
 df1 = df1[(df1.parallax>0)&(df1.parallax<1)]
 print('after parallax field filter: ',len(df1))
 
+#defining a custom fov
+#center_ra = 
+#center_dec = 
+#search_radius =
+
+
 p1 = df1.pmra
 p2 = df1.pmdec
 p3 = df1.parallax
@@ -146,26 +154,46 @@ XX = np.column_stack([df1.designation,X])
 print('Final data length before gmm : ', len(df1))
 
 #GMM
-p,q,kp,pcov = gauss_mix(X,15,'dpgmm') # Define number of gaussian components
+p,q,kp,pcov = gauss_mix(X,gnum,'dpgmm') # Define number of gaussian components
 print(p)
 print(q)
 
 c = wise(kp,pcov)
 #c = int(input('Enter the centroid: ')) # manually choose the centroid
-
+print('shape before',np.shape(c))
 c = np.array([c])
+print('shape',np.shape(c))
 print('Guess results! : ',kp[c,:])
 print('Guess Covariance matrix: ',pcov[c])
 
+#covariance and parameters
+
+print('Guess results! : ',kp[c,:])
+print('Guess Covariance matrix: ',pcov[c])
+print('*Cluster parameters derived from most probable members')
+print('pmra:  ',kp[c,1][0], ' +- ' , np.sqrt(pcov[c][0][0][0]/len(df1))) 
+print('pmdec: ',kp[c,2][0], ' +- ' , np.sqrt(pcov[c][0][1][1]/len(df1)))
+print('plx:   ',kp[c,3][0], ' +- ' , np.sqrt(pcov[c][0][2][2]/len(df1)))
+print('ra:    ',kp[c,4][0], ' +- ' , np.sqrt(pcov[c][0][3][3]/len(df1)))
+print('dec:   ',kp[c,5][0], ' +- ' , np.sqrt(pcov[c][0][4][4]/len(df1)))
+
+#PARAMETER PLOTS
+for i in range(gnum):
+    c = np.array([i])
+    print('shape here' ,np.shape(c))
+    plt.errorbar(c,kp[c,3][0], np.sqrt(pcov[c][0][2][2]), marker='s', mfc='red',mec='green', ms=2, mew=2,label='PMRA')
+plt.show()
+exit()
 #Stacking probability data from the gaussian and saving
 gdata = np.column_stack([XX,q])
 pb = np.zeros(len(p))
 gmm_prob = np.zeros(1)
 for j in range(len(p)):
     pb[j] = p[j][q[j]]
-    gmm_prob = np.vstack((gmm_prob,p[j][int(c)]))
+    gmm_prob0 = np.vstack((gmm_prob0,p[j][c]))
 gdata = np.column_stack([gdata,pb])
-df1['gmm_prob'] = gmm_prob[1:]
+df1['gmm_prob_c0'] = gmm_prob[1:]
+
 df1.to_csv(fname+'_GEDR3_GMM_5D.csv')
 
 ############################################################################
