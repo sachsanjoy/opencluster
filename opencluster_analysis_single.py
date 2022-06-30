@@ -81,7 +81,14 @@ def gauss_mix(X,n,mode,plot=False):
         kp = np.column_stack((kp, centers[:, 2]))
         kp = np.column_stack((kp, centers[:, 3]))
         kp = np.column_stack((kp, centers[:, 4]))
-        
+    elif np.shape(X)[1] == 6:
+        kp = np.column_stack((kp[1:],centers[:, 0]))
+        kp = np.column_stack((kp, centers[:, 1]))
+        kp = np.column_stack((kp, centers[:, 2]))
+        kp = np.column_stack((kp, centers[:, 3]))
+        kp = np.column_stack((kp, centers[:, 4]))
+        kp = np.column_stack((kp, centers[:, 5]))
+            
     print('Centeroids')
     print(kp)
     return p,q,kp,pcov
@@ -92,7 +99,7 @@ def readARG():
         file_name = sys.argv[1]
         return file_name
     except:
-        print("Syntax -> python3 filename.csv")
+        print("Syntax -> python3 opencluster_analysis_single.py filename.csv number_of_gmm")
     exit()
 
 file_name = readARG()
@@ -101,12 +108,15 @@ print(fname)
 
 tstart = time.time()
 df1 = pd.read_csv(file_name)
+
 print('original data: ',len(df1))
 df1 = df1[np.isfinite(df1['pmra'])]
 df1 = df1[np.isfinite(df1['pmdec'])]
 print('after proper-motion nan correction: ',len(df1))
 df1 = df1[np.isfinite(df1['parallax'])]
 print('after parallax nan correction:', len(df1))
+#df1 = df1[np.isfinite(df1['radial_velocity'])]
+#print('after radial_velocity nan correction:', len(df1))
 
 #uncertainity filter
 df1['un_pmra'] = abs(df1['pmra_error']/df1['pmra'])*100
@@ -134,13 +144,15 @@ print('after parallax field filter: ',len(df1))
 p1 = df1.pmra
 p2 = df1.pmdec
 p3 = df1.parallax
-p4 = df1.ra
-p5 = df1.dec
+#p4 = df1.radial_velocity
+p5 = df1.ra
+p6 = df1.dec
 
 X = np.column_stack([p1,p2])
 X = np.column_stack([X,p3])
-X = np.column_stack([X,p4])
+#X = np.column_stack([X,p4])
 X = np.column_stack([X,p5])
+X = np.column_stack([X,p6])
 
 XX = np.column_stack([df1.designation,X])
 print('Final data length before gmm : ', len(df1))
@@ -150,8 +162,8 @@ p,q,kp,pcov = gauss_mix(X,15,'dpgmm') # Define number of gaussian components
 print(p)
 print(q)
 
-c = wise(kp,pcov)
-#c = int(input('Enter the centroid: ')) # manually choose the centroid
+#c = wise(kp,pcov)
+c = int(input('Enter the centroid: ')) # manually choose the centroid
 
 c = np.array([c])
 print('Guess results! : ',kp[c,:])
@@ -167,6 +179,25 @@ for j in range(len(p)):
 gdata = np.column_stack([gdata,pb])
 df1['gmm_prob'] = gmm_prob[1:]
 df1.to_csv(fname+'_GEDR3_GMM_5D.csv')
+exit()
+
+######################################################################
+# cross matching with our NGC6791 catalogue
+df = pd.read_csv(fname+'_GEDR3_GMM_5D.csv')
+dq = pd.read_csv('NGC6819.csv')
+match = str('ID')+','+str('GAIA_ID')+','+str('gmm_prob')
+for i in range(len(dq)):
+    df1 = df[df.designation==dq.GAIA_ID[i]]
+    if len(df1)>=1:
+        df1 = df1.head(1)
+        match0 = str(dq.ID[i])+','+str(dq.GAIA_ID[i])+','+str(df1.gmm_prob.item())
+        match = np.vstack((match,match0))
+    else:
+        match0 = str(dq.ID[i])+','+str(dq.GAIA_ID[i])+','
+        match = np.vstack((match,match0))
+np.savetxt(fname+"_V_GEDR3_GMM_5D.csv",match,fmt="%s")
+
+exit()
 
 ############################################################################
 #deriving the cluster parameters from most probable members of the cluster
@@ -210,18 +241,3 @@ print('dec:   ',kp[c,5][0], ' +- ' , np.sqrt(pcov[c][0][4][4]/len(df)))
 
 print('Time Elasped: ',time.time()-tstart,' seconds')
 
-######################################################################
-# cross matching with our NGC6791 catalogue
-df = pd.read_csv(fname+'_GEDR3_GMM_5D.csv')
-dq = pd.read_csv('NGC6791.csv')
-match = str('ID')+','+str('GAIA_ID')+','+str('gmm_prob')
-for i in range(len(dq)):
-    df1 = df[df.designation==dq.GAIA_ID[i]]
-    if len(df1)>=1:
-        df1 = df1.head(1)
-        match0 = str(dq.ID[i])+','+str(dq.GAIA_ID[i])+','+str(df1.gmm_prob.item())
-        match = np.vstack((match,match0))
-    else:
-        match0 = str(dq.ID[i])+','+str(dq.GAIA_ID[i])+','
-        match = np.vstack((match,match0))
-np.savetxt(fname+"V6791_GEDR3_GMM_5D.csv",match,fmt="%s")
